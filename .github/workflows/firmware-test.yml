@@ -1,0 +1,43 @@
+name: Firmware Test
+
+on:
+  push:
+    paths:
+      - "firmware/**"
+      - "backend/app/services/template.py"
+  pull_request:
+    paths:
+      - "firmware/**"
+
+jobs:
+  compile:
+    name: Compile Firmware (${{ matrix.board }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        board: [nodemcuv2, d1_mini, esp32dev]
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ matrix.board }}-${{ hashFiles('firmware/**/*.ini') }}
+
+      - name: Install PlatformIO
+        run: pip install platformio==6.1.16
+
+      - name: Compile ESP8266 firmware
+        if: matrix.board != 'esp32dev'
+        run: pio run -e ${{ matrix.board }} -d firmware/templates/esp8266/
+
+      - name: Compile ESP32 firmware
+        if: matrix.board == 'esp32dev'
+        run: pio run -e ${{ matrix.board }} -d firmware/templates/esp32/

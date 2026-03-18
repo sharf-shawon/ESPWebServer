@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+  web:
+    image: ghcr.io/sharf-shawon/espwebserver:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - ENVIRONMENT=production
+      - REDIS_URL=redis://redis:6379/0
+      - BUILD_TIMEOUT=120
+      - MAX_HTML_SIZE=512000
+      - BUILD_WORKERS=2
+      - CORS_ORIGINS=https://your-domain.com
+    volumes:
+      - firmware_cache:/tmp/firmware
+      - /var/log/esp-deployer:/var/log/esp-deployer
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  redis_data:
+  firmware_cache:
