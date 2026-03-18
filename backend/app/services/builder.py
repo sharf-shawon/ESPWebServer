@@ -153,7 +153,10 @@ class BuildService:
         """Locate the compiled .bin firmware file."""
         candidates = list(project_dir.glob(f".pio/build/{env}/*.bin"))
         # Filter out SPIFFS/littlefs images
-        fw_candidates = [f for f in candidates if "spiffs" not in f.name.lower() and "littlefs" not in f.name.lower()]
+        fw_candidates = [
+            f for f in candidates
+            if "spiffs" not in f.name.lower() and "littlefs" not in f.name.lower()
+        ]
         if not fw_candidates:
             raise FileNotFoundError(f"No firmware .bin found in {project_dir}/.pio/build/{env}/")
         return fw_candidates[0]

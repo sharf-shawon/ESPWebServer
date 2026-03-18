@@ -82,6 +82,9 @@ async def start_build(
 
     await cache.set_job_status(job_id, "queued")
     builder = BuildService(cache)
-    background_tasks.add_task(builder.build, job_id, build_req.board_id, build_req.html, build_req.css, build_req.js, content_hash)
+    background_tasks.add_task(
+        builder.build,
+        job_id, build_req.board_id, build_req.html, build_req.css, build_req.js, content_hash,
+    )
 
     return BuildResponse(job_id=job_id, cached=False, estimated_seconds=60)
