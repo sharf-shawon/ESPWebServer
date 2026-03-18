@@ -18,7 +18,7 @@ board_build.filesystem = littlefs
 lib_deps =
     tzapu/WiFiManager@^0.16.0
     me-no-dev/ESPAsyncTCP@^1.2.2
-    me-no-dev/ESP Async WebServer@^1.2.3
+    esphome/ESPAsyncWebServer-esphome@^3.2.2
 build_flags =
     -D BOARD_ESP8266
     -D CONFIG_LITTLEFS_SPIFFS_COMPAT=1
@@ -76,7 +76,6 @@ void setup() {
     return;
   }
 
-  wifiManager.setConfigPortalSSID("esp-web-server");
   wifiManager.setConfigPortalTimeout(180);
   if (!wifiManager.autoConnect("esp-web-server")) {
     Serial.println("WiFi config timeout, restarting");
@@ -148,7 +147,6 @@ void setup() {
     return;
   }
 
-  wifiManager.setConfigPortalSSID("esp-web-server");
   wifiManager.setConfigPortalTimeout(180);
   if (!wifiManager.autoConnect("esp-web-server")) {
     Serial.println("WiFi config timeout, restarting");
