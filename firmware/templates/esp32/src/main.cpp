@@ -30,7 +30,6 @@ void setup() {
 
   Serial.println("LittleFS mounted OK");
 
-  wifiManager.setConfigPortalSSID("esp-web-server");
   wifiManager.setConfigPortalTimeout(180);
 
   if (!wifiManager.autoConnect("esp-web-server")) {
