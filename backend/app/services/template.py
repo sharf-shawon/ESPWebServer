@@ -16,7 +16,6 @@ framework = arduino
 monitor_speed = 115200
 board_build.filesystem = littlefs
 lib_deps =
-    tzapu/WiFiManager@^0.16.0
     me-no-dev/ESPAsyncTCP@^1.2.2
     esphome/ESPAsyncWebServer-esphome@^3.2.2
 build_flags =
@@ -48,13 +47,14 @@ build_flags =
 _ESP8266_MAIN = r"""
 #include <Arduino.h>
 #include <LittleFS.h>
-#include <WiFiManager.h>
+#include <ESP8266WiFi.h>
 #include <ESPAsyncWebServer.h>
 
 #define LED_PIN 2
+#define WIFI_CONFIG_FILE "/wifi.cfg"
+#define CONNECT_TIMEOUT_MS 15000
 
 AsyncWebServer server(80);
-WiFiManager wifiManager;
 
 void ledPulse(int count, int onMs, int offMs) {
   for (int i = 0; i < count; i++) {
@@ -65,21 +65,93 @@ void ledPulse(int count, int onMs, int offMs) {
   }
 }
 
+bool readWiFiConfig(String &ssid, String &password) {
+  if (!LittleFS.exists(WIFI_CONFIG_FILE)) return false;
+  File f = LittleFS.open(WIFI_CONFIG_FILE, "r");
+  if (!f) return false;
+  ssid = f.readStringUntil('\n');
+  password = f.readStringUntil('\n');
+  f.close();
+  ssid.trim();
+  password.trim();
+  return ssid.length() > 0;
+}
+
+void saveWiFiConfig(const String &ssid, const String &password) {
+  File f = LittleFS.open(WIFI_CONFIG_FILE, "w");
+  f.println(ssid);
+  f.println(password);
+  f.close();
+}
+
+bool connectToWiFi() {
+  String ssid, password;
+  if (!readWiFiConfig(ssid, password)) return false;
+  Serial.println("Connecting to: " + ssid);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid.c_str(), password.c_str());
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED) {
+    if (millis() - start > CONNECT_TIMEOUT_MS) return false;
+    delay(500);
+  }
+  return true;
+}
+
+void startConfigPortal() {
+  Serial.println("Starting config portal AP: esp-web-server");
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP("esp-web-server");
+
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *req) {
+    req->send(200, "text/html",
+      "<!DOCTYPE html><html><head><title>WiFi Setup</title>"
+      "<meta name='viewport' content='width=device-width,initial-scale=1'></head>"
+      "<body><h2>WiFi Configuration</h2>"
+      "<form method='post' action='/save'>"
+      "SSID:<br><input name='ssid'><br>"
+      "Password:<br><input type='password' name='pass'><br><br>"
+      "<button type='submit'>Save &amp; Connect</button>"
+      "</form></body></html>");
+  });
+
+  server.on("/save", HTTP_POST, [](AsyncWebServerRequest *req) {
+    if (!req->hasParam("ssid", true)) {
+      req->send(400, "text/plain", "Missing SSID");
+      return;
+    }
+    String ssid = req->getParam("ssid", true)->value();
+    String pass = req->hasParam("pass", true)
+                    ? req->getParam("pass", true)->value()
+                    : "";
+    saveWiFiConfig(ssid, pass);
+    req->send(200, "text/plain", "Saved! Restarting...");
+    delay(500);
+    ESP.restart();
+  });
+
+  server.onNotFound([](AsyncWebServerRequest *req) {
+    req->send(404, "text/plain", "Not found");
+  });
+
+  server.begin();
+  Serial.println("Config portal running at http://192.168.4.1");
+}
+
 void setup() {
   Serial.begin(115200);
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH);
 
   if (!LittleFS.begin()) {
-    Serial.println("LittleFS mount failed");
-    ledPulse(5, 500, 200); // long pulse = error
+    Serial.println("LittleFS mount failed - format required?");
+    ledPulse(5, 500, 200);
     return;
   }
 
-  wifiManager.setConfigPortalTimeout(180);
-  if (!wifiManager.autoConnect("esp-web-server")) {
-    Serial.println("WiFi config timeout, restarting");
-    ESP.restart();
+  if (!connectToWiFi()) {
+    startConfigPortal();
+    return;
   }
 
   Serial.println("WiFi connected: " + WiFi.localIP().toString());
@@ -106,12 +178,11 @@ void setup() {
   });
 
   server.begin();
-  ledPulse(2, 100, 100); // short pulse = success
+  ledPulse(2, 100, 100);
   Serial.println("Web server started");
 }
 
 void loop() {
-  // Blink LED briefly on request (handled in server callbacks)
   delay(10);
 }
 """
