@@ -15,7 +15,7 @@ RUN npm run build
 # =============================================================================
 # Stage 2: Python + PlatformIO toolchain builder
 # =============================================================================
-FROM python:3.13-slim AS backend-builder
+FROM python:3.14-slim AS backend-builder
 WORKDIR /app
 
 # Install system dependencies
@@ -63,7 +63,7 @@ RUN mkdir -p /tmp/pio-prebuild32 && \
 # =============================================================================
 # Stage 3: Runtime image
 # =============================================================================
-FROM python:3.13-slim AS runtime
+FROM python:3.14-slim AS runtime
 WORKDIR /app
 
 # Install nginx and runtime dependencies
