@@ -1,0 +1,42 @@
+name: Board Support Request
+description: Request support for a new ESP board
+labels: ["board-support"]
+body:
+  - type: input
+    id: board_name
+    attributes:
+      label: Board Name
+      placeholder: "e.g., TTGO T-Display ESP32"
+    validations:
+      required: true
+
+  - type: input
+    id: chip
+    attributes:
+      label: Chip
+      placeholder: "e.g., ESP32, ESP8266, ESP32-S3"
+    validations:
+      required: true
+
+  - type: input
+    id: flash_size
+    attributes:
+      label: Flash Size
+      placeholder: "e.g., 4MB"
+    validations:
+      required: true
+
+  - type: input
+    id: platformio_env
+    attributes:
+      label: PlatformIO Environment
+      description: The PlatformIO board identifier
+      placeholder: "e.g., ttgo-t1"
+    validations:
+      required: true
+
+  - type: input
+    id: product_url
+    attributes:
+      label: Product URL
+      placeholder: "https://..."
