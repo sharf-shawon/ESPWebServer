@@ -35,6 +35,17 @@ export function useFlasher() {
 
       setFlashProgress({ status: "connecting", message: "Connecting to board...", progress: 0 });
 
+      let transport: { disconnect: () => Promise<void> } | null = null;
+      let port: { close: () => Promise<void> } | null = null;
+
+      const isAlreadyClosedError = (error: unknown): boolean => {
+        if (!(error instanceof Error)) return false;
+        return (
+          error.message.includes("already closed") ||
+          error.message.includes("InvalidStateError")
+        );
+      };
+
       try {
         // Fetch firmware binary
         const response = await fetch(firmwareUrl);
@@ -49,10 +60,10 @@ export function useFlasher() {
           requestPort: () => Promise<{ close: () => Promise<void> }>;
         }
         const serial = (navigator as Navigator & { serial: WebSerialNavigator }).serial;
-        const port = await serial.requestPort();
+        port = await serial.requestPort();
 
         setFlashProgress({ status: "connecting", message: "Opening serial port...", progress: 5 });
-        const transport = new Transport(port, true);
+        transport = new Transport(port, true);
 
         const loader = new ESPLoader({
           transport,
@@ -100,23 +111,37 @@ export function useFlasher() {
               progress: pct,
             });
           },
-          calculateMD5Hash: (image: string) => {
-            // Simple pass-through - verification happens via esptool
-            return image;
-          },
         });
 
         setFlashProgress({ status: "verifying", message: "Verifying flash...", progress: 95 });
 
         await loader.softReset(false);
-        await transport.disconnect();
-        await port.close();
 
         setFlashProgress({ status: "success", message: "Flash complete! Board is restarting...", progress: 100 });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown flash error";
         setFlashProgress({ status: "error", message, progress: 0 });
         throw err;
+      } finally {
+        if (transport) {
+          try {
+            await transport.disconnect();
+          } catch (error) {
+            if (!isAlreadyClosedError(error)) {
+              console.warn("Failed to disconnect transport", error);
+            }
+          }
+        }
+
+        if (port) {
+          try {
+            await port.close();
+          } catch (error) {
+            if (!isAlreadyClosedError(error)) {
+              console.warn("Failed to close serial port", error);
+            }
+          }
+        }
       }
     },
     [isWebSerialSupported]

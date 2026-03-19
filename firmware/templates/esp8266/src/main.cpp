@@ -2,12 +2,14 @@
 #include <LittleFS.h>
 #include <ESP8266WiFi.h>
 #include <ESPAsyncWebServer.h>
+#include <Ticker.h>
 
 #define LED_PIN 2
 #define WIFI_CONFIG_FILE "/wifi.cfg"
 #define CONNECT_TIMEOUT_MS 15000
 
 AsyncWebServer server(80);
+Ticker restartTicker;
 
 void ledPulse(int count, int onMs, int offMs) {
   for (int i = 0; i < count; i++) {
@@ -30,11 +32,17 @@ bool readWiFiConfig(String &ssid, String &password) {
   return ssid.length() > 0;
 }
 
-void saveWiFiConfig(const String &ssid, const String &password) {
+bool saveWiFiConfig(const String &ssid, const String &password) {
   File f = LittleFS.open(WIFI_CONFIG_FILE, "w");
+  if (!f) return false;
   f.println(ssid);
   f.println(password);
   f.close();
+  return true;
+}
+
+void deferredRestart() {
+  ESP.restart();
 }
 
 bool connectToWiFi() {
@@ -69,18 +77,29 @@ void startConfigPortal() {
   });
 
   server.on("/save", HTTP_POST, [](AsyncWebServerRequest *req) {
-    if (!req->hasParam("ssid", true)) {
-      req->send(400, "text/plain", "Missing SSID");
+    AsyncWebParameter *ssidParam = req->getParam("ssid", true);
+    if (!ssidParam) {
+      req->send(400, "text/plain", "Missing SSID parameter");
       return;
     }
-    String ssid = req->getParam("ssid", true)->value();
-    String pass = req->hasParam("pass", true)
-                    ? req->getParam("pass", true)->value()
-                    : "";
-    saveWiFiConfig(ssid, pass);
+
+    String ssid = ssidParam->value();
+    ssid.trim();
+    if (ssid.length() == 0) {
+      req->send(400, "text/plain", "SSID cannot be empty");
+      return;
+    }
+
+    AsyncWebParameter *passParam = req->getParam("pass", true);
+    String pass = passParam ? passParam->value() : "";
+
+    if (!saveWiFiConfig(ssid, pass)) {
+      req->send(500, "text/plain", "Failed to save WiFi config");
+      return;
+    }
+
     req->send(200, "text/plain", "Saved! Restarting...");
-    delay(500);
-    ESP.restart();
+    restartTicker.once_ms(500, deferredRestart);
   });
 
   server.onNotFound([](AsyncWebServerRequest *req) {

@@ -35,6 +35,17 @@
   ```
 - The web deployer flashes firmware only; SPIFFS upload requires PlatformIO
 
+**ESP8266 crash: `Exception (9)` with `excvaddr=0x00000003`**
+- This usually indicates an invalid/null pointer access in request handling.
+- Rebuild and reflash with the latest template firmware (includes safer `/save` parameter handling).
+- If you still see resets, erase flash before reflash:
+  ```
+  pio run -t erase -e nodemcuv2
+  pio run -t upload -e nodemcuv2
+  pio run -t uploadfs -e nodemcuv2
+  ```
+- Check serial monitor at `115200` and confirm the board reaches `HTTP server started on port 80`.
+
 ## Docker Issues
 
 **Image too large**
